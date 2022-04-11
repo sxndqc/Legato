@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Legato</string>
+    <string name="drawingAnnouncement">Draw with music.</string>
+    <string name="canvasContentDescription">Legato enables drawing with music.</string>
+    <string name="buttonTextStart">Start</string>
+    <string name="buttonTextPause">Pause</string>
+    <string name="buttonTextClear">Clear</string>
+    <string name="textMute">No Sound</string>
+    <string name="noAudioPermission">No Microphone Permission</string>
+</resources>
