@@ -17,14 +17,22 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.GestureDetectorCompat
 import be.tarsos.dsp.AudioEvent
 import be.tarsos.dsp.pitch.PitchDetectionResult
+import java.lang.Integer.max
+import java.lang.Integer.min
+import java.lang.Math.pow
 import java.util.*
 import java.util.stream.IntStream
+import kotlin.math.exp
 import kotlin.math.ln
+import kotlin.math.pow
 
 const val NO_VALUE = -1F
 const val NO_VALUE_INT = -1
 const val SPEED = 10f
 const val STRETCH = 20f
+const val ADJUST_Y = 3
+const val NEIGHBOR = 3
+const val REACT_RANGE = 50
 
 open class Transcriber @JvmOverloads constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int = 0)
     : View(context, attrs, defStyleAttr){
@@ -37,7 +45,7 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     : Transcriber(context, attrs, defStyleAttr){
 
     class Trunk(val id: Int, var x: Float, var y: Float,
-                var alive: Boolean, var pitched: Boolean)
+                var alive: Boolean, var pitched: Boolean, var volumeHeight: Float)
 
     class Note(val id: Int, var infoStart: Int, var infoEnd: Int, var radius: Float,
                var x: Float = NO_VALUE, var y: Float = NO_VALUE,
@@ -48,6 +56,11 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     private val paintFill = Paint().apply {
         isAntiAlias = true
         color = ContextCompat.getColor(context, R.color.black)
+        style = Paint.Style.FILL_AND_STROKE
+    }
+    private val paintFillYellow = Paint().apply {
+        isAntiAlias = true
+        color = ContextCompat.getColor(context, R.color.yellow)
         style = Paint.Style.FILL_AND_STROKE
     }
     var gestureOperation: Boolean = false
@@ -62,7 +75,8 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
 
     private fun trunking(ib: InfoBlock) {
         // each move forward a speed length
-        trunks.add(Trunk(ib.id, this.width + SPEED / 2, heightCalc(ib.frequency), false, ib.whetherNote))
+        trunks.add(Trunk(ib.id, this.width + SPEED / 2, heightCalc(ib.frequency), false,
+                ib.whetherNote, volumeCalc(ib.volume)))
         trunks.forEach {
             it.x -= SPEED
             it.alive = !((it.x < 0) or (it.x > this.width))
@@ -71,10 +85,58 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
 
     private fun trunkDraw(canvas: Canvas) {
         trunks.forEach {
-            if (it.alive and it.pitched)
+            if (it.alive and it.pitched) {
                 canvas.drawRect(it.x - SPEED / 2, it.y - STRETCH / 2,
                         it.x + SPEED / 2, it.y + STRETCH / 2, paintFill)
+                canvas.drawRect(it.x - SPEED / 2, this.height - it.volumeHeight,
+                        it.x + SPEED / 2, this.height.toFloat(), paintFillYellow)
+            }
         }
+    }
+
+    fun moveBubbles(distanceX : Float){
+        trunks.forEach{
+            it.x -= distanceX
+            it.alive = !((it.x < 0) or (it.x > this.width))
+        }
+        invalidate()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    fun moveBlocks(x: Float, y: Float, distanceY: Float){
+        // get the id, use exp
+        val currentId: Int = ((x - trunks[0].x) / SPEED).toInt()
+
+        if (y in trunks[currentId].y - REACT_RANGE .. trunks[currentId].y + REACT_RANGE){
+            trunks[currentId].y -= distanceY / ADJUST_Y
+            infoList[currentId].frequency = pitchCalc(trunks[currentId].y)
+            for(i in 1..NEIGHBOR) {
+                if (currentId - i >= 0) {
+                    trunks[currentId - i].y -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                    infoList[currentId - i].frequency = pitchCalc(trunks[currentId - i].y)
+                }
+                if (currentId + i <= trunks.lastIndex) {
+                    trunks[currentId + i].y -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                    infoList[currentId + i].frequency = pitchCalc(trunks[currentId + i].y)
+                }
+            }
+        }
+
+        if (y in trunks[currentId].volumeHeight - REACT_RANGE .. trunks[currentId].volumeHeight + REACT_RANGE){
+            trunks[currentId].volumeHeight -= distanceY / ADJUST_Y
+            infoList[currentId].volume = volumeBackCalc(trunks[currentId].volumeHeight)
+            for(i in 1..NEIGHBOR) {
+                if (currentId - i >= 0) {
+                    trunks[currentId - i].volumeHeight -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                    infoList[currentId - i].volume = volumeBackCalc(trunks[currentId - i].volumeHeight)
+                }
+                if (currentId + i <= trunks.lastIndex) {
+                    trunks[currentId + i].volumeHeight -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                    infoList[currentId + i].volume = volumeBackCalc(trunks[currentId + i].volumeHeight)
+                }
+            }
+        }
+        invalidate()
     }
 
     private fun heightCalc(freq: Float): Float {
@@ -82,6 +144,18 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
             (ln(440 / freq) / ln(2.0) * 12 * STRETCH + this.height / 3).toFloat()
         else
             -1f
+    }
+
+    private fun pitchCalc(y: Float): Float {
+        return 440 / (2f.pow((y - this.height / 3) / STRETCH / 12))
+    }
+
+    private fun volumeCalc(volume: Double) : Float {
+        return ((volume - (-80)) * 6).toFloat()
+    }
+
+    private fun volumeBackCalc(volumeHeight: Float): Double{
+        return (volumeHeight / 6 - 80).toDouble()
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -107,65 +181,8 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         trunkDraw(canvas)
     }
 
-}
-
-// ---------------------Editor Part------------------------------
-
-const val DEBUG_TAG = "TEST"
-
-class Editor: GestureDetector.SimpleOnGestureListener(){
-
-    override fun onDown(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onDown: $event")
-        return true
-    }
-
-    override fun onFling(
-            event1: MotionEvent,
-            event2: MotionEvent,
-            velocityX: Float,
-            velocityY: Float
-    ): Boolean {
-        Log.d(DEBUG_TAG, "onFling: $event1 $event2")
-        return true
-    }
-
-    override fun onLongPress(event: MotionEvent) {
-        Log.d(DEBUG_TAG, "onLongPress: $event")
-    }
-
-    override fun onScroll(
-            event1: MotionEvent,
-            event2: MotionEvent,
-            distanceX: Float,
-            distanceY: Float
-    ): Boolean {
-        Log.d(DEBUG_TAG, "onScroll: $event1 $event2")
-        return true
-    }
-
-    override fun onShowPress(event: MotionEvent) {
-        Log.d(DEBUG_TAG, "onShowPress: $event")
-    }
-
-    override fun onSingleTapUp(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onSingleTapUp: $event")
-        return true
-    }
-
-    override fun onDoubleTap(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onDoubleTap: $event")
-        return true
-    }
-
-    override fun onDoubleTapEvent(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onDoubleTapEvent: $event")
-        return true
-    }
-
-    override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onSingleTapConfirmed: $event")
-        return true
+    fun test(){
+        Log.d(DEBUG_TAG, "onDown")
     }
 
 }

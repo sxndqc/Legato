@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var dispatcher: AudioDispatcher
     private lateinit var p: PitchProcessor
     private lateinit var mDetector: GestureDetectorCompat
+    private lateinit var editor: Editor
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,7 +55,9 @@ class MainActivity : AppCompatActivity() {
         btnClear.setOnClickListener{
             recreate()
         }
-        mDetector = GestureDetectorCompat(this, Editor())
+        val theFrame = findViewById<PVNView>(R.id.theFrame)
+        editor = Editor(false, theFrame)
+        mDetector = GestureDetectorCompat(this, editor)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -150,6 +153,7 @@ class MainActivity : AppCompatActivity() {
             "Stop".also { btn.text = it }
             val theFrame = findViewById<PVNView>(R.id.theFrame)
             theFrame.gestureOperation = false
+            editor.editorValid = false
         }
     }
 
@@ -164,6 +168,7 @@ class MainActivity : AppCompatActivity() {
             "Start".also { btn.text = it }
             val theFrame = findViewById<PVNView>(R.id.theFrame)
             theFrame.gestureOperation = true
+            editor.editorValid = true
         }
     }
 
