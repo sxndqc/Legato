@@ -74,18 +74,17 @@ class MainActivity : AppCompatActivity() {
             recreate()
         }
 
-
-//        val toggleNT: ToggleButton = findViewById(R.id.btnNote)
-//        toggleNT.setOnCheckedChangeListener { _, isChecked ->
-//            if (isChecked) {
-//                noTr = NoteTrunk.NOTE
-//                theFrame.changeToNote()
-//            } else {
-//                // The toggle is disabled
-//                noTr = NoteTrunk.TRUNK
-//                theFrame.changeToTrunk()
-//            }
-//        }
+        val toggleNT: ToggleButton = findViewById(R.id.btnNote)
+        toggleNT.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                noTr = NoteTrunk.NOTE
+                theFrame.changeToNote()
+            } else {
+                // The toggle is disabled
+                noTr = NoteTrunk.TRUNK
+                theFrame.changeToTrunk()
+            }
+        }
 
         //TODO: 几个状态要写出来
 

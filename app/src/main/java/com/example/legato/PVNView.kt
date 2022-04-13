@@ -33,10 +33,11 @@ const val ADJUST_Y = 1
 const val NEIGHBOR = 5
 const val REACT_RANGE = 100
 const val NOTE_DISPOSITION = 5
+const val NOTE_MOVE = 50
 
 abstract class Transcriber @JvmOverloads constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int = 0)
     : View(context, attrs, defStyleAttr){
-    protected class InfoBlock(val id: Int, var frequency: Float, var volume: Double, val whetherNote: Boolean,
+    protected class InfoBlock(val id: Int, var frequency: Float, var volume: Double, val isANote: Boolean,
                               var noteBelong: Int = NO_VALUE_INT, var noteBelongStart: Int = NO_VALUE_INT)
     protected var infoList: MutableList<InfoBlock> = mutableListOf()
     var isForReplay: Boolean = false
@@ -49,7 +50,7 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
                 var alive: Boolean, var pitched: Boolean,
                 var volumeHeight: Float, var played: Boolean = false)
     class Note(val id: Int, var infoStart: Int, var infoEnd: Int, var radius: Float,
-               var x: Float = NO_VALUE, var y: Float = NO_VALUE,
+               var x: Float = NO_VALUE, var y: Float = NO_VALUE, var isRest: Boolean,
                var alive: Boolean, var played: Boolean = false)
     private var trunks: MutableList<Trunk> = mutableListOf()
     private var notes: MutableList<Note> = mutableListOf()
@@ -82,13 +83,23 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         style = Paint.Style.FILL_AND_STROKE
         alpha = 50
     }
+    private val paintNoteUnselected = Paint().apply {
+        isAntiAlias = true
+        color = ContextCompat.getColor(context, R.color.black)
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+    }
+    private val paintCover = Paint().apply{
+        color = ContextCompat.getColor(context, R.color.black)
+        alpha = 50
+    }
 
     private var splitLine = 0f
     private var upperSplit = 0f
     private var lowerSplit = 0f
     private var lastIndexX = 0f
 
-    private var currentNote: Int = -100
+    private var currentNote: Int = -150
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -109,7 +120,7 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         // each move forward a speed length
         // Log.d("TEST", "nums:  $splitLine , $upperSplit , $lowerSplit , $lastIndexX")
         trunks.add(Trunk(ib.id, this.width + SPEED / 2, heightCalc(ib.frequency), false,
-                ib.whetherNote, volumeCalc(ib.volume)))
+                ib.isANote, volumeCalc(ib.volume)))
         trunks.forEach {
             it.x -= SPEED
             it.alive = !((it.x < 0) or (it.x > this.width))
@@ -120,14 +131,22 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     private fun noting(ib: InfoBlock){
         // if diverged from previous average for 1/12 scale, then counted as a separated note
         val thisNote = noteCalc(ib.frequency)
-        if (thisNote!=currentNote){
+        if (thisNote !=currentNote){
             currentNote = thisNote
             notes.add(Note(notes.size, ib.id, ib.id, radiusCalc(0),
-                    lastIndexX - NOTE_DISPOSITION, noteHeightCalc(currentNote), true, false))
+                    lastIndexX - NOTE_DISPOSITION, noteHeightCalc(currentNote), isRest = !ib.isANote,
+                    alive=true, played = false))
+            notes.forEach {
+                it.x -= NOTE_MOVE
+                it.alive = !((it.x < 0) or (it.x > this.width))
+                it.played = it.x < splitLine
+            }
         } else {
             notes.last().infoEnd = ib.id
             notes.last().radius = radiusCalc(notes.last().infoEnd - notes.last().infoStart)
+            ib.noteBelong = notes.lastIndex
         }
+
 
     }
 
@@ -145,7 +164,11 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     }
 
     private fun noteDraw(canvas: Canvas){
-
+        notes.forEach{
+            if (it.alive and !it.isRest) {
+                canvas.drawCircle(it.x, it.y, it.radius, paintNoteUnselected)
+            }
+        }
     }
 
     private fun trunkReplayDraw(canvas: Canvas) {
@@ -163,7 +186,13 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     }
 
     private fun noteReplayDraw(canvas: Canvas){
-
+        canvas.drawLine(splitLine, upperSplit, splitLine, lowerSplit, paintSplitLine)
+        notes.forEach{
+            if (it.alive and !it.isRest) {
+                canvas.drawCircle(it.x, it.y, it.radius, paintNoteUnselected)
+            }
+        }
+        canvas.drawRect(0f, 0f, splitLine, this.height.toFloat(), paintCover)
     }
 
     fun moveBubbles(distanceX : Float){
@@ -222,6 +251,10 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         invalidate()
     }
 
+    fun moveNotes(x: Float, y: Float, distanceY: Float){
+        val currentId: Int = ((x - trunks[0].x) / SPEED).toInt()
+    }
+
     private fun heightCalc(freq: Float): Float {
         return if (freq > 20)
             (ln(440 / freq) / ln(2.0) * 12 * STRETCH + this.height / 3).toFloat()
@@ -249,14 +282,17 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     }
 
     private fun noteCalc(freq: Float) : Int {
-        return (log2(freq / 440) * 12).roundToInt()
+        return if (freq>20)
+            (log2(freq / 440) * 12).roundToInt()
+        else
+            -100
     }
 
     private fun radiusCalc(length: Int) : Float {
         // this function can be renewable
-        val base = 3f
-        val multiplier = 10f
-        val compressor = 10f
+        val base = 10f
+        val multiplier = 5f
+        val compressor = 5f
         return (ln(length * multiplier + 1)) / compressor + base
     }
 
@@ -315,12 +351,31 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
 
     fun changeToNote(){
         isInTrunk = false
-
+        // align at lastX
+        // actually, after editing, note needs re-generation from info blocks...
+        if (notes.isNotEmpty()) {
+            val xGap = notes.last().x - lastIndexX
+            notes.forEach {
+                it.x -= xGap
+                it.alive = !((it.x < 0) or (it.x > this.width))
+                it.played = it.x < splitLine
+            }
+            invalidate()
+        }
     }
 
     fun changeToTrunk(){
         isInTrunk = true
-
+        // align at lastX
+        if (trunks.isNotEmpty()) {
+            val xGap = trunks.last().x - lastIndexX
+            trunks.forEach {
+                it.x -= xGap
+                it.alive = !((it.x < 0) or (it.x > this.width))
+                it.played = it.x < splitLine
+            }
+            invalidate()
+        }
     }
 
 }
