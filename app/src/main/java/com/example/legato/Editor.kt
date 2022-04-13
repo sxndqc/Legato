@@ -1,8 +1,10 @@
 package com.example.legato
 
+import android.os.Build
 import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
+import androidx.annotation.RequiresApi
 import java.lang.Math.abs
 import kotlin.properties.Delegates
 
@@ -13,6 +15,7 @@ const val DEBUG_TAG = "TEST"
 class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDetector.SimpleOnGestureListener() {
 
     var editorValid: Boolean = initialValid
+    var isForReplay: Boolean = false
     var initialMoveCount = 0
     private var movingSwipe by Delegates.notNull<Boolean>()
 
@@ -37,6 +40,7 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
         Log.d(DEBUG_TAG, "onLongPress: $event")
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     override fun onScroll(
             event1: MotionEvent,
             event2: MotionEvent,
@@ -69,7 +73,10 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
 
     override fun onSingleTapUp(event: MotionEvent): Boolean {
         Log.d(DEBUG_TAG, "onSingleTapUp: $event")
-        return true
+        return if (isForReplay){
+            viewToEdit.controlReplay()
+            true
+        } else false
     }
 
     override fun onDoubleTap(event: MotionEvent): Boolean {

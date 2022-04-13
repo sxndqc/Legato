@@ -115,6 +115,38 @@
             android:layout_weight="1" >
         </Space>
 
+<!--        <ToggleButton-->
+<!--            android:id="@+id/btnReplay"-->
+<!--            style="@style/Widget.AppCompat.Button"-->
+<!--            android:layout_width="wrap_content"-->
+<!--            android:layout_height="match_parent"-->
+<!--            android:textOff="Recording"-->
+<!--            android:textOn="Replaying"-->
+<!--            android:layout_weight="1"-->
+<!--            android:textSize="12sp" />-->
+
+<!--        <Space-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="match_parent"-->
+<!--            android:layout_weight="1" >-->
+<!--        </Space>-->
+
+        <ToggleButton
+            android:id="@+id/btnNote"
+            style="@style/Widget.AppCompat.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:textOff="Trunk"
+            android:textOn="Note"
+            android:layout_weight="1"
+            android:textSize="12sp" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" >
+        </Space>
+
     </LinearLayout>
 
 <!--    <fragment-->

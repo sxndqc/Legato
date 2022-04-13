@@ -2,6 +2,7 @@ package com.example.legato
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.media.tv.TvRecordingClient
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
@@ -9,6 +10,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ToggleButton
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintSet
@@ -21,6 +23,13 @@ import be.tarsos.dsp.pitch.PitchProcessor
 import kotlin.properties.Delegates
 
 const val REQUEST_CODE = 200
+enum class RecordReplay{
+    RECORDING, REPLAYING
+}
+enum class NoteTrunk{
+    NOTE, TRUNK
+}
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -33,6 +42,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var p: PitchProcessor
     private lateinit var mDetector: GestureDetectorCompat
     private lateinit var editor: Editor
+    var reRe: RecordReplay = RecordReplay.RECORDING
+    var noTr: NoteTrunk = NoteTrunk.TRUNK
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,22 +53,42 @@ class MainActivity : AppCompatActivity() {
 
         val times = findViewById<TextView>(R.id.tvTimes)
         times.text = cnt.toString()
+        val theFrame = findViewById<PVNView>(R.id.theFrame)
+        editor = Editor(false, theFrame)
+        mDetector = GestureDetectorCompat(this, editor)
 
         val btn = findViewById<Button>(R.id.btnStartStop)
         btn.setOnClickListener {
             if (listeningProcessing){
                 stopRecording()
+                theFrame.setReplay()
+                editor.isForReplay = true
             } else {
                 startRecording()
+                theFrame.quitReplay()
+                editor.isForReplay = false
             }
         }
         val btnClear = findViewById<Button>(R.id.btnClear)
         btnClear.setOnClickListener{
             recreate()
         }
-        val theFrame = findViewById<PVNView>(R.id.theFrame)
-        editor = Editor(false, theFrame)
-        mDetector = GestureDetectorCompat(this, editor)
+
+
+//        val toggleNT: ToggleButton = findViewById(R.id.btnNote)
+//        toggleNT.setOnCheckedChangeListener { _, isChecked ->
+//            if (isChecked) {
+//                noTr = NoteTrunk.NOTE
+//                theFrame.changeToNote()
+//            } else {
+//                // The toggle is disabled
+//                noTr = NoteTrunk.TRUNK
+//                theFrame.changeToTrunk()
+//            }
+//        }
+
+        //TODO: 几个状态要写出来
+
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -151,9 +182,6 @@ class MainActivity : AppCompatActivity() {
             times.text = cnt.toString()
             val btn = findViewById<Button>(R.id.btnStartStop)
             "Stop".also { btn.text = it }
-            val theFrame = findViewById<PVNView>(R.id.theFrame)
-            theFrame.gestureOperation = false
-            editor.editorValid = false
         }
     }
 
@@ -166,8 +194,6 @@ class MainActivity : AppCompatActivity() {
             times.text = cnt.toString()
             val btn = findViewById<Button>(R.id.btnStartStop)
             "Start".also { btn.text = it }
-            val theFrame = findViewById<PVNView>(R.id.theFrame)
-            theFrame.gestureOperation = true
             editor.editorValid = true
         }
     }
