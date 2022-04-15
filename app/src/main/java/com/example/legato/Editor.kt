@@ -56,7 +56,7 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
             if (movingSwipe) {
                 viewToEdit.moveBubbles(distanceX)
             } else {
-                viewToEdit.moveBlocks(event1.x, event1.y, distanceY)
+                viewToEdit.moveAdjust(event1.x, event1.y, distanceY)
             }
             true
             // y轴变化需要定位到哪几个id需要动，这个比x轴的变化要难搞一些，还需要记录id和x的对应关系

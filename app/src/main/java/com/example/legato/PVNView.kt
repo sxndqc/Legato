@@ -35,7 +35,7 @@ const val NO_VALUE_INT = -1
 const val SPEED = 10f
 const val STRETCH = 20f
 const val ADJUST_Y = 1
-const val NEIGHBOR = 5
+const val NEIGHBOR = 10
 const val REACT_RANGE = 100
 const val NOTE_DISPOSITION = 5
 const val NOTE_MOVE = 50
@@ -260,44 +260,64 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    fun moveBlocks(x: Float, y: Float, distanceY: Float){
-        // get the id, use exp
-        val currentId: Int = ((x - trunks[0].x) / SPEED).toInt()
-
-        if (y in trunks[currentId].y - REACT_RANGE .. trunks[currentId].y + REACT_RANGE){
-            trunks[currentId].y -= distanceY // ADJUST_Y
-            infoList[currentId].frequency = pitchCalc(trunks[currentId].y)
-            for(i in 1..NEIGHBOR) {
-                if (currentId - i >= 0) {
-                    trunks[currentId - i].y -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
-                    infoList[currentId - i].frequency = pitchCalc(trunks[currentId - i].y)
-                }
-                if (currentId + i <= trunks.lastIndex) {
-                    trunks[currentId + i].y -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
-                    infoList[currentId + i].frequency = pitchCalc(trunks[currentId + i].y)
-                }
-            }
-        }
-
-        if (y in trunks[currentId].volumeHeight - REACT_RANGE .. trunks[currentId].volumeHeight + REACT_RANGE){
-            trunks[currentId].volumeHeight -= distanceY / ADJUST_Y
-            infoList[currentId].volume = volumeBackCalc(trunks[currentId].volumeHeight)
-            for(i in 1..NEIGHBOR) {
-                if (currentId - i >= 0) {
-                    trunks[currentId - i].volumeHeight -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
-                    infoList[currentId - i].volume = volumeBackCalc(trunks[currentId - i].volumeHeight)
-                }
-                if (currentId + i <= trunks.lastIndex) {
-                    trunks[currentId + i].volumeHeight -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
-                    infoList[currentId + i].volume = volumeBackCalc(trunks[currentId + i].volumeHeight)
-                }
-            }
-        }
-        invalidate()
+    fun moveAdjust(x: Float, y: Float, distanceY: Float){
+        if (isInTrunk)
+            moveBlocks(x, y, distanceY)
+        else
+            moveNotes(x, y, distanceY)
     }
 
-    fun moveNotes(x: Float, y: Float, distanceY: Float){
-        val currentId: Int = ((x - trunks[0].x) / SPEED).toInt()
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun moveBlocks(x: Float, y: Float, distanceY: Float){
+        // get the id, use exp
+        if (trunks.isNotEmpty()) {
+            val currentId: Int = ((x - trunks[0].x) / SPEED).toInt()
+            if (y in trunks[currentId].y - REACT_RANGE .. trunks[currentId].y + REACT_RANGE){
+                trunks[currentId].y -= distanceY // ADJUST_Y
+                infoList[currentId].frequency = pitchCalc(trunks[currentId].y)
+                for(i in 1..NEIGHBOR) {
+                    if (currentId - i >= 0) {
+                        trunks[currentId - i].y -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                        infoList[currentId - i].frequency = pitchCalc(trunks[currentId - i].y)
+                    }
+                    if (currentId + i <= trunks.lastIndex) {
+                        trunks[currentId + i].y -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                        infoList[currentId + i].frequency = pitchCalc(trunks[currentId + i].y)
+                    }
+                }
+            }
+
+            if (y in trunks[currentId].volumeHeight - REACT_RANGE .. trunks[currentId].volumeHeight + REACT_RANGE){
+                trunks[currentId].volumeHeight -= distanceY / ADJUST_Y
+                infoList[currentId].volume = volumeBackCalc(trunks[currentId].volumeHeight)
+                for(i in 1..NEIGHBOR) {
+                    if (currentId - i >= 0) {
+                        trunks[currentId - i].volumeHeight -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                        infoList[currentId - i].volume = volumeBackCalc(trunks[currentId - i].volumeHeight)
+                    }
+                    if (currentId + i <= trunks.lastIndex) {
+                        trunks[currentId + i].volumeHeight -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                        infoList[currentId + i].volume = volumeBackCalc(trunks[currentId + i].volumeHeight)
+                    }
+                }
+            }
+            invalidate()
+        }
+    }
+
+    private fun moveNotes(x: Float, y: Float, distanceY: Float){
+        if (notes.isNotEmpty()) {
+            val currentId: Int = ((x - notes[0].x) / NOTE_MOVE).toInt()
+            val itt = notes[currentId]
+//            val distance = sqrt((x - itt.x).pow(2) + (y-itt.y).pow(2))
+//            if (distance > itt.radius)
+//                return
+            itt.y -= distanceY
+            itt.thisNote = noteCalc(pitchCalc(itt.y))
+            for (i in itt.infoStart..itt.infoEnd)
+                infoList[i].frequency = pitchCalc(heightCalc(infoList[i].frequency) - distanceY)
+            invalidate()
+        }
     }
 
     private fun heightCalc(freq: Float): Float {
