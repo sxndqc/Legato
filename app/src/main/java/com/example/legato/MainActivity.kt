@@ -51,8 +51,8 @@ class MainActivity : AppCompatActivity() {
         listeningThreadRunning = false
         listeningProcessing = false
 
-        val times = findViewById<TextView>(R.id.tvTimes)
-        times.text = cnt.toString()
+//        val times = findViewById<TextView>(R.id.tvTimes)
+//        times.text = cnt.toString()
         val theFrame = findViewById<PVNView>(R.id.theFrame)
         editor = Editor(false, theFrame)
         mDetector = GestureDetectorCompat(this, editor)
@@ -89,6 +89,7 @@ class MainActivity : AppCompatActivity() {
         val toggleGrid: ToggleButton = findViewById(R.id.btnGrid)
         toggleGrid.setOnCheckedChangeListener { _, isChecked ->
             theFrame.grid = isChecked
+            theFrame.invalidate()
         }
 
         //TODO: 几个状态要写出来
@@ -111,8 +112,8 @@ class MainActivity : AppCompatActivity() {
                 prepareRecording()
             }
         } else {
-            val herc = findViewById<TextView>(R.id.tvHerz)
-            "No Audio Permission".also { herc.text = it }
+//            val herc = findViewById<TextView>(R.id.tvHerz)
+//            "No Audio Permission".also { herc.text = it }
             requestPermissions(permissions,
                     REQUEST_CODE
             )
@@ -131,8 +132,8 @@ class MainActivity : AppCompatActivity() {
             if(permissionGranted){
                 prepareRecording()
             } else {
-                val herc = findViewById<TextView>(R.id.tvHerz)
-                "No Audio Permission".also { herc.text = it }
+//                val herc = findViewById<TextView>(R.id.tvHerz)
+//                "No Audio Permission".also { herc.text = it }
             }
         }
     }
@@ -142,9 +143,9 @@ class MainActivity : AppCompatActivity() {
         if (listeningThreadRunning and listeningProcessing) {
             dispatcher.removeAudioProcessor(p)
             listeningProcessing = false
-            val times = findViewById<TextView>(R.id.tvTimes)
+//            val times = findViewById<TextView>(R.id.tvTimes)
             cnt += 1
-            times.text = cnt.toString()
+//            times.text = cnt.toString()
         }
     }
 
@@ -158,14 +159,14 @@ class MainActivity : AppCompatActivity() {
             val pitchInHz = result.pitch
             runOnUiThread {
                 frames += 1
-                val herc = findViewById<TextView>(R.id.tvHerz)
-                val timestamp = findViewById<TextView>(R.id.tvTotalTime)
-                val theFrames = findViewById<TextView>(R.id.tvFrames)
-                val dbspl = findViewById<TextView>(R.id.tvDB)
-                herc.text = pitchInHz.toString()
-                timestamp.text = e.timeStamp.toString()
-                theFrames.text = frames.toString()
-                dbspl.text = e.getdBSPL().toString()
+//                val herc = findViewById<TextView>(R.id.tvHerz)
+//                val timestamp = findViewById<TextView>(R.id.tvTotalTime)
+//                val theFrames = findViewById<TextView>(R.id.tvFrames)
+//                val dbspl = findViewById<TextView>(R.id.tvDB)
+//                herc.text = pitchInHz.toString()
+//                timestamp.text = e.timeStamp.toString()
+//                theFrames.text = frames.toString()
+//                dbspl.text = e.getdBSPL().toString()
                 val sceneFrame = findViewById<PVNView>(R.id.theFrame)
                 sceneFrame.convertToInfo(result, e, frames)
             }
@@ -181,9 +182,9 @@ class MainActivity : AppCompatActivity() {
         if (listeningThreadRunning) {
             dispatcher.addAudioProcessor(p)
             listeningProcessing = true
-            val times = findViewById<TextView>(R.id.tvTimes)
+//            val times = findViewById<TextView>(R.id.tvTimes)
             cnt += 1
-            times.text = cnt.toString()
+//            times.text = cnt.toString()
             val btn = findViewById<Button>(R.id.btnStartStop)
             "Stop".also { btn.text = it }
         }
@@ -193,9 +194,9 @@ class MainActivity : AppCompatActivity() {
         if (listeningThreadRunning) {
             dispatcher.removeAudioProcessor(p)
             listeningProcessing = false
-            val times = findViewById<TextView>(R.id.tvTimes)
+ //           val times = findViewById<TextView>(R.id.tvTimes)
             cnt += 1
-            times.text = cnt.toString()
+ //           times.text = cnt.toString()
             val btn = findViewById<Button>(R.id.btnStartStop)
             "Start".also { btn.text = it }
             editor.editorValid = true

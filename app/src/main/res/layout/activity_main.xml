@@ -23,50 +23,50 @@
         android:orientation="horizontal"
         app:layout_constraintTop_toTopOf="parent">
 
-        <TextView
-            android:id="@+id/tvHerz"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="@string/textMute"
-            android:textColor="@color/purple_200"
-            android:textSize="12sp" />
+<!--        <TextView-->
+<!--            android:id="@+id/tvHerz"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_weight="1"-->
+<!--            android:text="@string/textMute"-->
+<!--            android:textColor="@color/purple_200"-->
+<!--            android:textSize="12sp" />-->
 
-        <TextView
-            android:id="@+id/tvTimes"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="0times"
-            android:textColor="@color/purple_200"
-            android:textSize="12sp" />
+<!--        <TextView-->
+<!--            android:id="@+id/tvTimes"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_weight="1"-->
+<!--            android:text="0times"-->
+<!--            android:textColor="@color/purple_200"-->
+<!--            android:textSize="12sp" />-->
 
-        <TextView
-            android:id="@+id/tvTotalTime"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="0second"
-            android:textColor="@color/purple_200"
-            android:textSize="12sp" />
+<!--        <TextView-->
+<!--            android:id="@+id/tvTotalTime"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_weight="1"-->
+<!--            android:text="0second"-->
+<!--            android:textColor="@color/purple_200"-->
+<!--            android:textSize="12sp" />-->
 
-        <TextView
-            android:id="@+id/tvFrames"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="0frame"
-            android:textColor="@color/purple_200"
-            android:textSize="12sp" />
+<!--        <TextView-->
+<!--            android:id="@+id/tvFrames"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_weight="1"-->
+<!--            android:text="0frame"-->
+<!--            android:textColor="@color/purple_200"-->
+<!--            android:textSize="12sp" />-->
 
-        <TextView
-            android:id="@+id/tvDB"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="0db"
-            android:textColor="@color/white"
-            android:textSize="12sp" />
+<!--        <TextView-->
+<!--            android:id="@+id/tvDB"-->
+<!--            android:layout_width="0dp"-->
+<!--            android:layout_height="wrap_content"-->
+<!--            android:layout_weight="1"-->
+<!--            android:text="0db"-->
+<!--            android:textColor="@color/white"-->
+<!--            android:textSize="12sp" />-->
 
     </LinearLayout>
 

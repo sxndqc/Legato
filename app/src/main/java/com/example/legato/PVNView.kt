@@ -1,7 +1,10 @@
 package com.example.legato
 
+import android.animation.ArgbEvaluator
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Color.RED
 import android.graphics.Color.rgb
 import android.graphics.Paint
 import android.icu.text.IDNA
@@ -15,6 +18,7 @@ import androidx.annotation.ColorInt
 import androidx.annotation.ColorRes
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.GestureDetectorCompat
 import be.tarsos.dsp.AudioEvent
 import be.tarsos.dsp.pitch.PitchDetectionResult
@@ -51,9 +55,9 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     class Trunk(val id: Int, var x: Float, var y: Float,
                 var alive: Boolean, var pitched: Boolean,
                 var volumeHeight: Float, var played: Boolean = false)
-    class Note(val id: Int, var infoStart: Int, var infoEnd: Int, var radius: Float,
+    class Note(val id: Int, var thisNote: Int, var infoStart: Int, var infoEnd: Int, var radius: Float,
                var x: Float = NO_VALUE, var y: Float = NO_VALUE, var isRest: Boolean,
-               var alive: Boolean, var played: Boolean = false)
+               var alive: Boolean, var played: Boolean = false, var lastNote: Int = -150)
     private var trunks: MutableList<Trunk> = mutableListOf()
     private var notes: MutableList<Note> = mutableListOf()
     private var isInTrunk: Boolean = true
@@ -65,19 +69,18 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     }
     private val paintSplitLine = Paint().apply {
         isAntiAlias = true
-        color = ContextCompat.getColor(context, R.color.black)
+        color = Color.WHITE
         strokeCap = Paint.Cap.ROUND
         strokeWidth = 1f
     }
     private val paintGridLine = Paint().apply {
         isAntiAlias = true
-        color = ContextCompat.getColor(context, R.color.gray)
+        color = Color.GRAY
         strokeCap = Paint.Cap.ROUND
-        strokeWidth = 0.5f
+        strokeWidth = 1.5f
     }
     private val paintPlayed = Paint().apply {
         isAntiAlias = true
-        color = ContextCompat.getColor(context, R.color.black)
         style = Paint.Style.FILL_AND_STROKE
         alpha = 50
     }
@@ -158,24 +161,33 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
 
     private fun addNote(x: Float, ib: InfoBlock):Boolean{
         // this should include an algorithm
+        // unstably and harmony
         val thisNote = noteCalc(ib.frequency)
         return if (thisNote !=currentNote){
+            notes.add(Note(notes.size, thisNote, ib.id, ib.id, radiusCalc(0),
+                    x, noteHeightCalc(thisNote), isRest = !ib.isANote,
+                    alive=true, played = false, lastNote = currentNote))
             currentNote = thisNote
-            notes.add(Note(notes.size, ib.id, ib.id, radiusCalc(0),
-                    x, noteHeightCalc(currentNote), isRest = !ib.isANote,
-                    alive=true, played = false))
+            ib.noteBelong = notes.lastIndex
+            ib.noteBelongStart = notes.last().infoStart
             true
         } else {
             notes.last().infoEnd = ib.id
             notes.last().radius = radiusCalc(notes.last().infoEnd - notes.last().infoStart)
             ib.noteBelong = notes.lastIndex
+            ib.noteBelongStart = notes.last().infoStart
             false
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun trunkDraw(canvas: Canvas) {
         trunks.forEach {
             if (it.alive and it.pitched) {
+                val theColor = colorCalculate(
+                        notes[infoList[it.id].noteBelong].thisNote,
+                        notes[infoList[it.id].noteBelong].lastNote)
+                paintFill.color = theColor
                 canvas.drawRect(it.x - SPEED / 2, it.y - STRETCH / 2,
                         it.x + SPEED / 2, it.y + STRETCH / 2,
                         paintFill)
@@ -186,18 +198,27 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun noteDraw(canvas: Canvas){
         notes.forEach{
             if (it.alive and !it.isRest) {
+                paintNoteUnselected.color = colorCalculate(it.thisNote, it.lastNote)
                 canvas.drawCircle(it.x, it.y, it.radius, paintNoteUnselected)
             }
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun trunkReplayDraw(canvas: Canvas) {
         canvas.drawLine(splitLine, upperSplit, splitLine, lowerSplit, paintSplitLine)
         trunks.forEach {
             if (it.alive and it.pitched) {
+                val theColor = colorCalculate(
+                        notes[infoList[it.id].noteBelong].thisNote,
+                        notes[infoList[it.id].noteBelong].lastNote)
+                paintFill.color = theColor
+                paintPlayed.color = theColor
+                paintPlayed.alpha = 50
                 canvas.drawRect(it.x - SPEED / 2, it.y - STRETCH / 2,
                         it.x + SPEED / 2, it.y + STRETCH / 2,
                         if (it.played) paintPlayed else paintFill)
@@ -208,9 +229,11 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun noteReplayDraw(canvas: Canvas){
         canvas.drawLine(splitLine, upperSplit, splitLine, lowerSplit, paintSplitLine)
         notes.forEach{
+            paintNoteUnselected.color = colorCalculate(it.thisNote, it.lastNote)
             if (it.alive and !it.isRest) {
                 canvas.drawCircle(it.x, it.y, it.radius, paintNoteUnselected)
             }
@@ -319,25 +342,20 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    private fun colorCalculate(sub: Double): FloatArray {
-        var c = FloatArray(3)
-        val r: Array<Int> = arrayOf(50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        val g: Array<Int> = arrayOf(0, 0, 50, 100, 150, 200, 240, 180, 140, 100, 60, 20)
-        val b: Array<Int> = arrayOf(200, 240, 0, 0, 0, 0, 0, 0, 0, 50, 100, 150)
-        for (i in IntStream.range(0, 12)) {
-            c[0] += ((1 / StrictMath.exp(StrictMath.abs(i - sub))) * r[i]).toFloat()
-            c[1] += ((1 / StrictMath.exp(StrictMath.abs(i - sub))) * g[i]).toFloat()
-            c[2] += ((1 / StrictMath.exp(StrictMath.abs(i - sub))) * b[i]).toFloat()
-        }
-        var s: Float = c[0] + c[1] + c[2];
-        c[0] = c[0] / s * 255;
-        c[1] = c[1] / s * 255;
-        c[2] = c[2] / s * 255;
-        return c;
+    private fun colorCalculate(last: Int, now: Int): Int {
+        val theColor = ArgbEvaluator()
+        // five-scale is green
+        val distance = (last - now) % 12
+        return if (distance <= 7)
+            theColor.evaluate(distance / 7f, Color.MAGENTA, Color.GREEN) as Int
+        else
+            theColor.evaluate((distance - 7) / 5f, Color.GREEN, Color.BLUE) as Int
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        canvas.drawColor(ResourcesCompat.getColor(resources, R.color.colorBackground, null))
         if (isForReplay)
             if (isInTrunk)
                 trunkReplayDraw(canvas)
@@ -348,6 +366,7 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
                 trunkDraw(canvas)
             else
                 noteDraw(canvas)
+        if (grid) drawGrid(canvas)
     }
 
     fun test(){
@@ -417,8 +436,8 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
 
     private fun putGrid(){
         // with tempo and all lines
-        val lowestNote : Int = ((this.height - height440) * 2 / 3 / STRETCH).toInt() + 1
-        val highestNote : Int =  - (height440 / STRETCH).toInt() - 1
+        val lowestNote : Int = ((this.height - height440) / STRETCH).toInt() - 1
+        val highestNote : Int =  - (height440 / STRETCH).toInt() + 1
         for (iNote in highestNote..lowestNote){
             ptsGrid += listOf(0f, iNote * STRETCH + height440, this.width.toFloat(), iNote * STRETCH + height440)
         }
