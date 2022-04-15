@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color.rgb
 import android.graphics.Paint
+import android.icu.text.IDNA
 import android.os.Build
 import android.util.AttributeSet
 import android.util.Log
@@ -41,6 +42,7 @@ abstract class Transcriber @JvmOverloads constructor(context: Context, attrs: At
                               var noteBelong: Int = NO_VALUE_INT, var noteBelongStart: Int = NO_VALUE_INT)
     protected var infoList: MutableList<InfoBlock> = mutableListOf()
     var isForReplay: Boolean = false
+    var grid : Boolean = false
 }
 
 class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int = 0)
@@ -55,6 +57,7 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     private var trunks: MutableList<Trunk> = mutableListOf()
     private var notes: MutableList<Note> = mutableListOf()
     private var isInTrunk: Boolean = true
+    private val ptsGrid = mutableListOf<Float>()
     private val paintFill = Paint().apply {
         isAntiAlias = true
         color = ContextCompat.getColor(context, R.color.black)
@@ -65,6 +68,12 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         color = ContextCompat.getColor(context, R.color.black)
         strokeCap = Paint.Cap.ROUND
         strokeWidth = 1f
+    }
+    private val paintGridLine = Paint().apply {
+        isAntiAlias = true
+        color = ContextCompat.getColor(context, R.color.gray)
+        strokeCap = Paint.Cap.ROUND
+        strokeWidth = 0.5f
     }
     private val paintPlayed = Paint().apply {
         isAntiAlias = true
@@ -98,8 +107,10 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     private var upperSplit = 0f
     private var lowerSplit = 0f
     private var lastIndexX = 0f
-
+    private var height440 = 0f
+    private var tempo = 60
     private var currentNote: Int = -150
+
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -107,6 +118,8 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         upperSplit = this.height / 5f
         lowerSplit = this.height * 4 / 5f
         lastIndexX = (this.width).toFloat()
+        height440 = this.height / 3f
+        putGrid()
     }
 
     fun convertToInfo(result: PitchDetectionResult, e: AudioEvent, t: Int) {
@@ -119,8 +132,7 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     private fun trunking(ib: InfoBlock) {
         // each move forward a speed length
         // Log.d("TEST", "nums:  $splitLine , $upperSplit , $lowerSplit , $lastIndexX")
-        trunks.add(Trunk(ib.id, this.width + SPEED / 2, heightCalc(ib.frequency), false,
-                ib.isANote, volumeCalc(ib.volume)))
+        addTrunk(this.width + SPEED / 2, ib)
         trunks.forEach {
             it.x -= SPEED
             it.alive = !((it.x < 0) or (it.x > this.width))
@@ -128,26 +140,37 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         }
     }
 
+    private fun addTrunk(x: Float, ib: InfoBlock){
+        trunks.add(Trunk(ib.id, x = x, heightCalc(ib.frequency), false,
+                ib.isANote, volumeCalc(ib.volume)))
+    }
+
     private fun noting(ib: InfoBlock){
         // if diverged from previous average for 1/12 scale, then counted as a separated note
-        val thisNote = noteCalc(ib.frequency)
-        if (thisNote !=currentNote){
-            currentNote = thisNote
-            notes.add(Note(notes.size, ib.id, ib.id, radiusCalc(0),
-                    lastIndexX - NOTE_DISPOSITION, noteHeightCalc(currentNote), isRest = !ib.isANote,
-                    alive=true, played = false))
+        if (addNote(lastIndexX - NOTE_DISPOSITION, ib)) {
             notes.forEach {
                 it.x -= NOTE_MOVE
                 it.alive = !((it.x < 0) or (it.x > this.width))
                 it.played = it.x < splitLine
             }
+        }
+    }
+
+    private fun addNote(x: Float, ib: InfoBlock):Boolean{
+        // this should include an algorithm
+        val thisNote = noteCalc(ib.frequency)
+        return if (thisNote !=currentNote){
+            currentNote = thisNote
+            notes.add(Note(notes.size, ib.id, ib.id, radiusCalc(0),
+                    x, noteHeightCalc(currentNote), isRest = !ib.isANote,
+                    alive=true, played = false))
+            true
         } else {
             notes.last().infoEnd = ib.id
             notes.last().radius = radiusCalc(notes.last().infoEnd - notes.last().infoStart)
             ib.noteBelong = notes.lastIndex
+            false
         }
-
-
     }
 
     private fun trunkDraw(canvas: Canvas) {
@@ -202,15 +225,14 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
                 it.alive = !((it.x < 0) or (it.x > this.width))
                 it.played = it.x < splitLine
             }
-            lastIndexX -= distanceX
         } else {
             notes.forEach{
                 it.x -= distanceX
                 it.alive = !((it.x < 0) or (it.x > this.width))
                 it.played = it.x < splitLine
             }
-            lastIndexX -= distanceX
         }
+        lastIndexX -= distanceX
         invalidate()
     }
 
@@ -220,7 +242,7 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         val currentId: Int = ((x - trunks[0].x) / SPEED).toInt()
 
         if (y in trunks[currentId].y - REACT_RANGE .. trunks[currentId].y + REACT_RANGE){
-            trunks[currentId].y -= distanceY / ADJUST_Y
+            trunks[currentId].y -= distanceY // ADJUST_Y
             infoList[currentId].frequency = pitchCalc(trunks[currentId].y)
             for(i in 1..NEIGHBOR) {
                 if (currentId - i >= 0) {
@@ -257,7 +279,7 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
 
     private fun heightCalc(freq: Float): Float {
         return if (freq > 20)
-            (ln(440 / freq) / ln(2.0) * 12 * STRETCH + this.height / 3).toFloat()
+            (ln(440 / freq) / ln(2.0) * 12 * STRETCH + height440).toFloat()
         else
             -1f
     }
@@ -291,8 +313,8 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     private fun radiusCalc(length: Int) : Float {
         // this function can be renewable
         val base = 10f
-        val multiplier = 5f
-        val compressor = 5f
+        val multiplier = 1f
+        val compressor = 0.2f
         return (ln(length * multiplier + 1)) / compressor + base
     }
 
@@ -353,8 +375,18 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
         isInTrunk = false
         // align at lastX
         // actually, after editing, note needs re-generation from info blocks...
+        var cnt = 0
+        if (infoList.isNotEmpty()) {
+            notes.clear()
+            currentNote = -150
+            infoList.forEach {
+                if (addNote(lastIndexX + NOTE_MOVE * cnt - NOTE_DISPOSITION, it)){
+                   cnt += 1
+                }
+            }
+        }
         if (notes.isNotEmpty()) {
-            val xGap = notes.last().x - lastIndexX
+            val xGap = cnt * NOTE_MOVE
             notes.forEach {
                 it.x -= xGap
                 it.alive = !((it.x < 0) or (it.x > this.width))
@@ -367,15 +399,32 @@ class PVNView  @JvmOverloads constructor(context: Context, attrs: AttributeSet?,
     fun changeToTrunk(){
         isInTrunk = true
         // align at lastX
+        if (infoList.isNotEmpty()) {
+            val firstX = lastIndexX - infoList.lastIndex * SPEED
+            trunks.clear()
+            infoList.forEach {
+                addTrunk(firstX + it.id * SPEED, it)
+            }
+        }
         if (trunks.isNotEmpty()) {
-            val xGap = trunks.last().x - lastIndexX
             trunks.forEach {
-                it.x -= xGap
-                it.alive = !((it.x < 0) or (it.x > this.width))
+                it.alive = it.x in 0f..this.width.toFloat()
                 it.played = it.x < splitLine
             }
             invalidate()
         }
     }
 
+    private fun putGrid(){
+        // with tempo and all lines
+        val lowestNote : Int = ((this.height - height440) * 2 / 3 / STRETCH).toInt() + 1
+        val highestNote : Int =  - (height440 / STRETCH).toInt() - 1
+        for (iNote in highestNote..lowestNote){
+            ptsGrid += listOf(0f, iNote * STRETCH + height440, this.width.toFloat(), iNote * STRETCH + height440)
+        }
+    }
+
+    private fun drawGrid(canvas: Canvas){
+        canvas.drawLines(ptsGrid.toFloatArray(), paintGridLine)
+    }
 }

@@ -10,8 +10,9 @@
     <color name="yellow">#FFFFFF66</color>
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
-    <color name="colorAccent">#FF4081</color>
+    <color name="colorAccent">#79973877</color>
     <color name="colorBackground">#FF120E24</color>
     <color name="colorPaint">#FFFFFFFF</color>
+    <color name="gray">#793E6E77</color>
 
 </resources>

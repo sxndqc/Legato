@@ -86,6 +86,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val toggleGrid: ToggleButton = findViewById(R.id.btnGrid)
+        toggleGrid.setOnCheckedChangeListener { _, isChecked ->
+            theFrame.grid = isChecked
+        }
+
         //TODO: 几个状态要写出来
 
     }
