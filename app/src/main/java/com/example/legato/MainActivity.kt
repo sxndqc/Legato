@@ -2,6 +2,7 @@ package com.example.legato
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.media.AudioFormat
 import android.media.tv.TvRecordingClient
 import android.os.Build
 import android.os.Bundle
@@ -23,6 +24,10 @@ import be.tarsos.dsp.pitch.PitchProcessor
 import kotlin.properties.Delegates
 
 const val REQUEST_CODE = 200
+const val SAMPLING_RATE = 22050
+const val BLOCK_SIZE = 2048
+const val BLOCK_OVERLAP = 0
+
 enum class RecordReplay{
     RECORDING, REPLAYING
 }
@@ -62,11 +67,11 @@ class MainActivity : AppCompatActivity() {
             if (listeningProcessing){
                 stopRecording()
                 theFrame.setReplay()
-                editor.isForReplay = true
+                editor.canReallyReplay = true
             } else {
                 startRecording()
                 theFrame.quitReplay()
-                editor.isForReplay = false
+                editor.canReallyReplay = false
             }
         }
         val btnClear = findViewById<Button>(R.id.btnClear)
@@ -151,7 +156,9 @@ class MainActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun prepareRecording(){
-        dispatcher = AudioDispatcherFactory.fromDefaultMicrophone(22050, 1024, 0)
+        dispatcher = AudioDispatcherFactory.fromDefaultMicrophone(SAMPLING_RATE, BLOCK_SIZE, BLOCK_OVERLAP)
+        val theFrame = findViewById<PVNView>(R.id.theFrame)
+        //theFrame.format = dispatcher.format as AudioFormat
         // dispatcher is a Runnable that plays a file and send whole to processor
         // the process is a processor that send each buffer to a handler
         // the handler contains a Runnable which handle every single pitch
@@ -167,11 +174,11 @@ class MainActivity : AppCompatActivity() {
 //                timestamp.text = e.timeStamp.toString()
 //                theFrames.text = frames.toString()
 //                dbspl.text = e.getdBSPL().toString()
-                val sceneFrame = findViewById<PVNView>(R.id.theFrame)
-                sceneFrame.convertToInfo(result, e, frames)
+
+                theFrame.convertToInfo(result, e, frames)
             }
         }
-        p = PitchProcessor(PitchProcessor.PitchEstimationAlgorithm.FFT_YIN, 22050F, 1024, pdh)
+        p = PitchProcessor(PitchProcessor.PitchEstimationAlgorithm.MPM, SAMPLING_RATE.toFloat(), BLOCK_SIZE, pdh)
 
         Thread(dispatcher, "Audio Dispatcher").start()
         listeningThreadRunning = true
@@ -187,6 +194,7 @@ class MainActivity : AppCompatActivity() {
 //            times.text = cnt.toString()
             val btn = findViewById<Button>(R.id.btnStartStop)
             "Stop".also { btn.text = it }
+            editor.editorValid = false
         }
     }
 

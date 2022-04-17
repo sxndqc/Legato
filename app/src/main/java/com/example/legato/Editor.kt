@@ -15,8 +15,8 @@ const val DEBUG_TAG = "TEST"
 class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDetector.SimpleOnGestureListener() {
 
     var editorValid: Boolean = initialValid
-    var isForReplay: Boolean = false
-    var initialMoveCount = 0
+    var canReallyReplay: Boolean = false
+    private var initialMoveCount = 0
     private var movingSwipe by Delegates.notNull<Boolean>()
 
     override fun onDown(event: MotionEvent): Boolean {
@@ -26,19 +26,19 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
         } else false
     }
 
-    override fun onFling(
-            event1: MotionEvent,
-            event2: MotionEvent,
-            velocityX: Float,
-            velocityY: Float
-    ): Boolean {
-        Log.d(DEBUG_TAG, "onFling: $event1 $event2")
-        return true
-    }
-
-    override fun onLongPress(event: MotionEvent) {
-        Log.d(DEBUG_TAG, "onLongPress: $event")
-    }
+//    override fun onFling(
+//            event1: MotionEvent,
+//            event2: MotionEvent,
+//            velocityX: Float,
+//            velocityY: Float
+//    ): Boolean {
+//        Log.d(DEBUG_TAG, "onFling: $event1 $event2")
+//        return true
+//    }
+//
+//    override fun onLongPress(event: MotionEvent) {
+//        Log.d(DEBUG_TAG, "onLongPress: $event")
+//    }
 
     @RequiresApi(Build.VERSION_CODES.N)
     override fun onScroll(
@@ -52,6 +52,10 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
             Log.d(DEBUG_TAG, "onScroll: $event1 $event2")
             if (initialMoveCount == 1) {
                 movingSwipe = kotlin.math.abs(distanceX) > kotlin.math.abs(distanceY)
+                if (canReallyReplay){
+                    canReallyReplay = false
+                    viewToEdit.stopReplay()
+                }
             }
             if (movingSwipe) {
                 viewToEdit.moveBubbles(distanceX)
@@ -71,27 +75,32 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
         }
     }
 
-    override fun onSingleTapUp(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onSingleTapUp: $event")
-        return if (isForReplay){
-            viewToEdit.controlReplay()
-            true
-        } else false
-    }
-
-    override fun onDoubleTap(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onDoubleTap: $event")
-        return true
-    }
-
-    override fun onDoubleTapEvent(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onDoubleTapEvent: $event")
-        return true
-    }
+//    override fun onSingleTapUp(event: MotionEvent): Boolean {
+//        Log.d(DEBUG_TAG, "onSingleTapUp: $event")
+//        return true
+//    }
+//
+//    override fun onDoubleTap(event: MotionEvent): Boolean {
+//        Log.d(DEBUG_TAG, "onDoubleTap: $event")
+//        return true
+//    }
+//
+//    override fun onDoubleTapEvent(event: MotionEvent): Boolean {
+//        Log.d(DEBUG_TAG, "onDoubleTapEvent: $event")
+//        return true
+//    }
 
     override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
         Log.d(DEBUG_TAG, "onSingleTapConfirmed: $event")
-        return true
+        return if (editorValid) {
+            canReallyReplay = !canReallyReplay
+            if(canReallyReplay){
+                viewToEdit.startReplay()
+                true
+            } else {
+                viewToEdit.stopReplay()
+                true
+            }
+        } else false
     }
-
 }
