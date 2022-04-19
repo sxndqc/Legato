@@ -27,6 +27,7 @@ class PitchShifterFloat(private var pitchShiftRatio: Double, private val sampleR
 
     fun process(floatInfo: FloatArray): FloatArray {
         if (pitchShiftRatio == 1.0) return floatInfo
+        Log.d("factor", pitchShiftRatio.toString())
         //val var2 = byteInfo.byteToFloatArray().clone()
         //val var2 = var1.floatBuffer.clone()
         val fftData = floatInfo.clone()
@@ -105,22 +106,26 @@ class PitchShifterFloat(private var pitchShiftRatio: Double, private val sampleR
         }
         fft.backwardsTransform(newFFTData)
 
+
+
         for (i in newFFTData.indices) {
             val window = (-0.5 * cos((2 * PI) * i.toDouble() / size.toDouble()) + 0.5).toFloat()
             outputAccumulator[i] += window * newFFTData[i] / osamp.toFloat()
+
             if (outputAccumulator[i] > 1.0 || outputAccumulator[i] < -1.0) {
                 Log.e("Warning", "Clipping!")
             }
         }
 
-        // if no overlap, osamp == size.
+        // if no overlap, osamp == 1.
 
         val stepSize = (size / osamp).toInt()
         // if no overlap, this is not working
-        arraycopy(outputAccumulator, stepSize, outputAccumulator, 0, size)
+        System.arraycopy(outputAccumulator, stepSize, outputAccumulator, 0, size)
         val newAudioBuffer = FloatArray(size)
-        arraycopy(outputAccumulator, 0, newAudioBuffer,size-stepSize, stepSize)
-        Log.d("output", newAudioBuffer.toString())
+        System.arraycopy(outputAccumulator, 0, newAudioBuffer,size-stepSize, stepSize)
+        for (i in newAudioBuffer.indices)
+            Log.d("output", newAudioBuffer[i].toString())
         return newAudioBuffer
     }
 

@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.AudioTrack.WRITE_BLOCKING
 import android.os.Build
 import android.os.SystemClock.sleep
 import android.util.AttributeSet
@@ -21,6 +22,7 @@ import be.tarsos.dsp.AudioDispatcher
 import be.tarsos.dsp.AudioEvent
 import be.tarsos.dsp.PitchShifter
 import be.tarsos.dsp.pitch.PitchDetectionResult
+import java.io.ByteArrayOutputStream
 import kotlin.math.*
 
 
@@ -43,8 +45,7 @@ abstract class Transcriber @JvmOverloads constructor(
 
     protected class InfoBlock(
         val id: Int,
-        var bufferPos: Int,
-        var bufferContent: AudioEvent,
+        var bufferContent: FloatArray,
         var frequency: Float,
         var volume: Double,
         val isANote: Boolean,
@@ -60,7 +61,7 @@ abstract class Transcriber @JvmOverloads constructor(
     private val minBufferSize = AudioTrack.getMinBufferSize(
         SAMPLING_RATE,
         AudioFormat.CHANNEL_OUT_MONO,
-        AudioFormat.ENCODING_PCM_16BIT
+        AudioFormat.ENCODING_PCM_FLOAT
     )
     @RequiresApi(Build.VERSION_CODES.M)
     protected val audioTrack = AudioTrack.Builder()
@@ -72,7 +73,7 @@ abstract class Transcriber @JvmOverloads constructor(
         )
         .setAudioFormat(
             AudioFormat.Builder()
-                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
                 .setSampleRate(SAMPLING_RATE)
                 .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                 .build()
@@ -154,8 +155,7 @@ class PVNView  @JvmOverloads constructor(
     private var height440 = 0f
     private var tempo = 60
     private var currentNote: Int = -150
-    lateinit var dispatcher: AudioDispatcher
-    lateinit var format : AudioFormat
+    lateinit var pitchShifterFloat: PitchShifterFloat
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -170,7 +170,7 @@ class PVNView  @JvmOverloads constructor(
     fun convertToInfo(result: PitchDetectionResult, e: AudioEvent, t: Int) {
         infoList.add(
             InfoBlock(
-                t, streaming.size, e, result.pitch, e.getdBSPL(), result.isPitched,
+                t, e.floatBuffer.clone(), result.pitch, e.getdBSPL(), result.isPitched,
                 originalFrequency = result.pitch
             )
         )
@@ -308,13 +308,18 @@ class PVNView  @JvmOverloads constructor(
     }
 
     fun moveBubbles(distanceX: Float){
+        if (infoList.isEmpty()) return
         if (isInTrunk){
+            if ((trunks[0].x - distanceX > splitLine) or (trunks.last().x - distanceX < splitLine))
+                return
             trunks.forEach{
                 it.x -= distanceX
                 it.alive = !((it.x < 0) or (it.x > this.width))
                 it.played = it.x < splitLine
             }
         } else {
+            if ((notes[0].x - distanceX > splitLine) or (notes.last().x - distanceX < splitLine))
+                return
             notes.forEach{
                 it.x -= distanceX
                 it.alive = !((it.x < 0) or (it.x > this.width))
@@ -340,14 +345,16 @@ class PVNView  @JvmOverloads constructor(
             val currentId: Int = ((x - trunks[0].x) / SPEED).toInt()
             if (currentId !in 0..trunks.lastIndex) return
             if (y in trunks[currentId].y - REACT_RANGE .. trunks[currentId].y + REACT_RANGE){
-                trunks[currentId].y -= distanceY
-                infoList[currentId].frequency = pitchCalc(trunks[currentId].y)
+                if (infoList[currentId].isANote) {
+                    trunks[currentId].y -= distanceY
+                    infoList[currentId].frequency = pitchCalc(trunks[currentId].y)
+                }
                 for(i in 1..NEIGHBOR) {
-                    if (currentId - i >= 0) {
+                    if (currentId - i >= 0) if (infoList[currentId - i].isANote) {
                         trunks[currentId - i].y -= distanceY / exp(i.toDouble()).toFloat()
                         infoList[currentId - i].frequency = pitchCalc(trunks[currentId - i].y)
                     }
-                    if (currentId + i <= trunks.lastIndex) {
+                    if (currentId + i <= trunks.lastIndex) if (infoList[currentId + i].isANote) {
                         trunks[currentId + i].y -= distanceY  / exp(i.toDouble()).toFloat()
                         infoList[currentId + i].frequency = pitchCalc(trunks[currentId + i].y)
                     }
@@ -355,15 +362,17 @@ class PVNView  @JvmOverloads constructor(
             }
 
             if (y in (this.height - trunks[currentId].volumeHeight - REACT_RANGE) .. (this.height - trunks[currentId].volumeHeight + REACT_RANGE)){
-                trunks[currentId].volumeHeight += distanceY / ADJUST_Y
-                infoList[currentId].volume = volumeBackCalc(trunks[currentId].volumeHeight)
+                if (infoList[currentId].isANote) {
+                    trunks[currentId].volumeHeight += distanceY / ADJUST_Y
+                    infoList[currentId].volume = volumeBackCalc(trunks[currentId].volumeHeight)
+                }
                 for(i in 1..NEIGHBOR) {
-                    if (currentId - i >= 0) {
-                        trunks[currentId - i].volumeHeight -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                    if (currentId - i >= 0) if (infoList[currentId - i].isANote) {
+                        trunks[currentId - i].volumeHeight += distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
                         infoList[currentId - i].volume = volumeBackCalc(trunks[currentId - i].volumeHeight)
                     }
-                    if (currentId + i <= trunks.lastIndex) {
-                        trunks[currentId + i].volumeHeight -= distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
+                    if (currentId + i <= trunks.lastIndex) if (infoList[currentId + i].isANote){
+                        trunks[currentId + i].volumeHeight += distanceY / ADJUST_Y / exp(i.toDouble()).toFloat()
                         infoList[currentId + i].volume = volumeBackCalc(trunks[currentId + i].volumeHeight)
                     }
                 }
@@ -383,7 +392,8 @@ class PVNView  @JvmOverloads constructor(
             itt.y -= distanceY
             itt.thisNote = noteCalc(pitchCalc(itt.y))
             for (i in itt.infoStart..itt.infoEnd)
-                infoList[i].frequency = pitchCalc(heightCalc(infoList[i].frequency) - distanceY)
+                if (infoList[i].isANote)
+                    infoList[i].frequency = pitchCalc(heightCalc(infoList[i].frequency) - distanceY)
             invalidate()
         }
     }
@@ -467,9 +477,14 @@ class PVNView  @JvmOverloads constructor(
 
     fun setReplay(){
         isForReplay = true
-
-        // audioTrack.play() // Play the track, because it is streaming, so need play first
-        // audioTrack.pause()
+        pitchShifterFloat = PitchShifterFloat(1.0, SAMPLING_RATE.toDouble(), BLOCK_SIZE, 0)
+        if (isInTrunk){
+            if (trunks[0].x > splitLine) moveBubbles(trunks[0].x - splitLine)
+            if (trunks.last().x < splitLine)  moveBubbles(trunks.last().x - splitLine)
+        } else {
+            if (notes[0].x > splitLine) moveBubbles(notes[0].x - splitLine)
+            if (notes.last().x < splitLine) moveBubbles(notes.last().x - splitLine)
+        }
         invalidate()
     }
 
@@ -484,57 +499,34 @@ class PVNView  @JvmOverloads constructor(
                 notes[((splitLine - notes[0].x) / NOTE_MOVE).toInt()].infoStart
             }
 
-//            val audioTrack = AudioTrack(
-//                AudioManager.STREAM_MUSIC, SAMPLING_RATE, AudioFormat.CHANNEL_OUT_MONO,
-//                AudioFormat.ENCODING_PCM_16BIT, BLOCK_SIZE * 2, AudioTrack.MODE_STATIC
-//            )
-//            val toStream = streaming.slice(infoList[currentId].bufferPos until streaming.size).toByteArray()
- //           val pitchShifter = PitchShifter(1.0, SAMPLING_RATE.toDouble(), BLOCK_SIZE, 0)
-
-//            audioTrack.write(
-//                toStream,
-//              0, toStream.size
-//            )
-
-            // TODO:整个事情就很扑朔迷离：设成STATIC的话，只能放一小节，而且换个位置就放不出来了；设成STREAM的话，如果PLAY在远处，
-        //  那么什么都放不出来；如果用toStream一次写入大量buffer，play在write后面，那只能放一小节；如果play在write前面一点点，那就可以放
-            // 整个后半段；如果play放在setReplay那里，那就只能放一次，能够都放出来，但是噼里啪啦；如果用runnable写入的话，那就会放出极其空灵的声音。
-            // 我猜测跟stream的流机制有关？
-            // TODO: 如果把AudioTrack的buffer调到4倍， 那么噼里啪啦的声音就没了，效果好得一逼。
-            // TODO: 这个时候把play刚刚放在write前面的话，那随便拖动随便放。如果play放在setReplay里面的话，就只能播放一次。
-            // TODO: 看起来像是，play只会等候一次，如果一次播完了，后面没有接上，它就自动销毁了，不会再播放后面新写入的内容了；
-            // TODO： 所以如果play放在write后面，意思就是只写入了buffer那么多的内容。放在write前面，就会认为是一个流输入。
-            // TODO： 而如果play放在了setReplay里面，那就是我点击第一次，等候流进入，然后播放了一次，停了，我再播的话，喔，是因为pause了没恢复。
-            // TODO: 所以play只能放在startReplay里面，不然没法点击开始和暂停，除非暂停只是切断了流入。
-            // TODO: 而play如果buffer没被填满的话，等待它的结果就是没满也开始播放，那就变成空灵音了。
-            // TODO: 而如果play被放在了write后面的话，那就只能写入buffer那么多的内容，所以就只能播一点。
-            // TODO: 所以我play放太远了，就没声音，是因为等待流的时候过长，自动结束了。放空灵声音，是因为写入速度太慢。爆破音是buffer问题。
-            // 那么事情明了了：全力写入，然后再来动图。但还是不能分批写入，，，这样写入了一次就会开始播放，还是音效奇葩。
-            // 要看怎么做成流。要不就只能合成之后再做了。
-
             val audioSender = Runnable {
                 Log.d("Here!", "Here")
                 for (i in currentId..infoList.lastIndex) {
                     if (isOnReplay) {
                         val ib = infoList[i]
-                        val factor = ib.frequency / ib.originalFrequency
-                        //pitchShifter.setPitchShiftFactor(1f)
-                        //pitchShifter.process(ib.bufferContent)
-
+                        var factor = 1f
+                        if (ib.isANote)
+                            factor = ib.frequency / ib.originalFrequency
+                        pitchShifterFloat.setPitchShiftFactor(factor)
+                        val processedBuffer = pitchShifterFloat.process(ib.bufferContent)
+                        //outByteStream.write(ib.bufferContent.toByteArray())
+                        //outByteStream.write(streaming.slice(ib.bufferPos until ib.bufferPos + ib.bufferContent.size).toByteArray())
                         audioTrack.write(
-                            ib.bufferContent.byteBuffer,
-                            0, ib.bufferContent.byteBuffer.size //ib.bufferContent.bufferSize
+                            processedBuffer,
+                            0, processedBuffer.size, WRITE_BLOCKING //ib.bufferContent.bufferSize
                         )
-                        // 那个复杂音效应该因为play必须要buffer填满了才播放，否则播放的时候采样率可能有问题
                     }
                 }
+                //audioTrack.write(outByteStream.toByteArray(),0,outByteStream.toByteArray().size)
+                isOnReplay = false
             }
             val imageMover = Runnable {
                 for (i in currentId..infoList.lastIndex) if (isOnReplay){
                     if (isInTrunk) {
                         moveBubbles(SPEED)
                     } else {
-                        moveBubbles(NOTE_MOVE.toFloat())
+                        moveBubbles((NOTE_MOVE / (notes[infoList[i].noteBelong].infoEnd -
+                                notes[infoList[i].noteBelong].infoStart + 1)).toFloat())
                     }
                     invalidate()
                     sleep((BLOCK_SIZE * 1000 / SAMPLING_RATE).toLong())
@@ -580,6 +572,10 @@ class PVNView  @JvmOverloads constructor(
             }
         }
         if (notes.isNotEmpty()) {
+            if (isOnReplay) {
+                if (notes[0].x > splitLine) moveBubbles(notes[0].x - splitLine)
+                else if (notes.last().x < splitLine) moveBubbles(notes.last().x - splitLine)
+            }
             val xGap = cnt * NOTE_MOVE
             notes.forEach {
                 it.x -= xGap
@@ -588,6 +584,7 @@ class PVNView  @JvmOverloads constructor(
             }
             invalidate()
         }
+
     }
 
     fun changeToTrunk(){
@@ -601,6 +598,10 @@ class PVNView  @JvmOverloads constructor(
             }
         }
         if (trunks.isNotEmpty()) {
+            if (isOnReplay) {
+                if (trunks[0].x > splitLine) moveBubbles(trunks[0].x - splitLine)
+                else if (trunks.last().x < splitLine)  moveBubbles(trunks.last().x - splitLine)
+            }
             trunks.forEach {
                 it.alive = it.x in 0f..this.width.toFloat()
                 it.played = it.x < splitLine
