@@ -28,7 +28,7 @@ import kotlin.math.*
 
 const val NO_VALUE = -1F
 const val NO_VALUE_INT = -1
-const val SPEED = 10f
+const val SPEED = 15f
 const val STRETCH = 20f
 const val ADJUST_Y = 1
 const val NEIGHBOR = 10
@@ -434,8 +434,9 @@ class PVNView  @JvmOverloads constructor(
     private fun radiusCalc(length: Int) : Float {
         // this function can be renewable
         val base = 10f
-        val multiplier = 1f
-        val compressor = 0.2f
+        val multiplier = 0.2f
+        val compressor = 0.1f
+        //return length * multiplier / compressor + base
         return (ln(length * multiplier + 1)) / compressor + base
     }
 
@@ -565,22 +566,28 @@ class PVNView  @JvmOverloads constructor(
         if (infoList.isNotEmpty()) {
             notes.clear()
             currentNote = -150
+            var currentId = ((splitLine - trunks[0].x) / SPEED).toInt()
+            if (currentId > infoList.lastIndex) currentId = infoList.lastIndex else
+                if (currentId < 0 ) currentId = 0
+            val calib = if(!isForReplay) 0f else
+                lastIndexX - splitLine -
+                        (infoList.last().noteBelong - infoList[currentId].noteBelong) * NOTE_MOVE
             infoList.forEach {
-                if (addNote(lastIndexX + NOTE_MOVE * cnt - NOTE_DISPOSITION, it)){
+                if (addNote(lastIndexX - calib + NOTE_MOVE * cnt - NOTE_DISPOSITION, it)){
                    cnt += 1
                 }
             }
         }
         if (notes.isNotEmpty()) {
-            if (isOnReplay) {
-                if (notes[0].x > splitLine) moveBubbles(notes[0].x - splitLine)
-                else if (notes.last().x < splitLine) moveBubbles(notes.last().x - splitLine)
-            }
-            val xGap = cnt * NOTE_MOVE
+            val xGap = (cnt-1) * NOTE_MOVE
             notes.forEach {
                 it.x -= xGap
                 it.alive = !((it.x < 0) or (it.x > this.width))
                 it.played = it.x < splitLine
+            }
+            if (isForReplay) {
+                if (notes[0].x > splitLine) moveBubbles(notes[0].x - splitLine)
+                else if (notes.last().x < splitLine) moveBubbles(notes.last().x - splitLine)
             }
             invalidate()
         }
@@ -593,12 +600,17 @@ class PVNView  @JvmOverloads constructor(
         if (infoList.isNotEmpty()) {
             val firstX = lastIndexX - infoList.lastIndex * SPEED
             trunks.clear()
+            var i = ((splitLine - notes[0].x) / NOTE_MOVE).toInt()
+            if (i>notes.lastIndex) i = notes.lastIndex else if (i<0) i = 0
+            val currentId = notes[i].infoStart
+            val calib = if(!isForReplay) 0f else
+                firstX + currentId * SPEED - splitLine
             infoList.forEach {
-                addTrunk(firstX + it.id * SPEED, it)
+                addTrunk(firstX - calib + it.id * SPEED, it)
             }
         }
         if (trunks.isNotEmpty()) {
-            if (isOnReplay) {
+            if (isForReplay) {
                 if (trunks[0].x > splitLine) moveBubbles(trunks[0].x - splitLine)
                 else if (trunks.last().x < splitLine)  moveBubbles(trunks.last().x - splitLine)
             }
