@@ -56,7 +56,7 @@ abstract class Transcriber @JvmOverloads constructor(
     var isForReplay: Boolean = false
     var isOnReplay: Boolean = false
     var grid : Boolean = false
-    protected val streaming : MutableList<Byte> = mutableListOf()
+    // protected val streaming : MutableList<Byte> = mutableListOf()
     private val minBufferSize = AudioTrack.getMinBufferSize(
         SAMPLING_RATE,
         AudioFormat.CHANNEL_OUT_MONO,
@@ -174,7 +174,7 @@ class PVNView  @JvmOverloads constructor(
                 originalFrequency = result.pitch
             )
         )
-        streaming += e.byteBuffer.toList()
+        //streaming += e.byteBuffer.toList()
         trunking(infoList[t])
         noting(infoList[t])
         invalidate()
