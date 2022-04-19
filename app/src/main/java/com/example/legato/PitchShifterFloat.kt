@@ -121,12 +121,16 @@ class PitchShifterFloat(private var pitchShiftRatio: Double, private val sampleR
 
         val stepSize = (size / osamp).toInt()
         // if no overlap, this is not working
-        System.arraycopy(outputAccumulator, stepSize, outputAccumulator, 0, size)
-        val newAudioBuffer = FloatArray(size)
-        System.arraycopy(outputAccumulator, 0, newAudioBuffer,size-stepSize, stepSize)
-        for (i in newAudioBuffer.indices)
-            Log.d("output", newAudioBuffer[i].toString())
-        return newAudioBuffer
+        return outputAccumulator.toList().slice(0 until size).toFloatArray()
+//        for (i in outputAccumulator.indices)
+//            Log.d("output", outputAccumulator[i].toString())
+//        arraycopy(outputAccumulator, stepSize, outputAccumulator, 0, size)
+//        for (i in outputAccumulator.indices)
+//            Log.d("JJJJJ", outputAccumulator[i].toString())
+//        val newAudioBuffer = FloatArray(size)
+//        System.arraycopy(outputAccumulator, 0, newAudioBuffer,size-stepSize, stepSize)
+
+
     }
 
 }
