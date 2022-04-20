@@ -130,22 +130,6 @@
             android:layout_weight="1" >
         </Space>
 
-
-
-    </LinearLayout>
-    <LinearLayout
-        android:id="@+id/linearLayoutThree"
-        android:layout_width="match_parent"
-        app:layout_constraintTop_toBottomOf="@id/linearLayoutTwo"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:orientation="horizontal"
-        >
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1" >
-        </Space>
         <ToggleButton
             android:id="@+id/btnNote"
             style="@style/Widget.AppCompat.Button"
@@ -193,6 +177,7 @@
             android:layout_height="match_parent"
             android:layout_weight="1" >
         </Space>
+
     </LinearLayout>
 
 <!--    <fragment-->

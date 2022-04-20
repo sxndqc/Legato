@@ -18,11 +18,8 @@ import android.view.View
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
-import be.tarsos.dsp.AudioDispatcher
 import be.tarsos.dsp.AudioEvent
-import be.tarsos.dsp.PitchShifter
 import be.tarsos.dsp.pitch.PitchDetectionResult
-import java.io.ByteArrayOutputStream
 import kotlin.math.*
 
 
@@ -51,13 +48,16 @@ abstract class Transcriber @JvmOverloads constructor(
         val isANote: Boolean,
         var noteBelong: Int = NO_VALUE_INT,
         var noteBelongStart: Int = NO_VALUE_INT,
-        var originalFrequency: Float
+        var originalFrequency: Float,
+        var originalVolume: Double
     )
     protected var infoList: MutableList<InfoBlock> = mutableListOf()
     var isForReplay: Boolean = false
     var isOnReplay: Boolean = false
     var grid : Boolean = false
+    var synthesisOrOST = false
     // protected val streaming : MutableList<Byte> = mutableListOf()
+    @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     private val minBufferSize = AudioTrack.getMinBufferSize(
         SAMPLING_RATE,
         AudioFormat.CHANNEL_OUT_MONO,
@@ -111,13 +111,13 @@ class PVNView  @JvmOverloads constructor(
     }
     private val paintSplitLine = Paint().apply {
         isAntiAlias = true
-        color = Color.WHITE
+        color = WHITE
         strokeCap = Paint.Cap.ROUND
         strokeWidth = 1f
     }
     private val paintGridLine = Paint().apply {
         isAntiAlias = true
-        color = Color.GRAY
+        color = GRAY
         strokeCap = Paint.Cap.ROUND
         strokeWidth = 1.5f
     }
@@ -153,9 +153,8 @@ class PVNView  @JvmOverloads constructor(
     private var lowerSplit = 0f
     private var lastIndexX = 0f
     private var height440 = 0f
-    private var tempo = 60
     private var currentNote: Int = -150
-    lateinit var pitchShifterFloat: PitchShifterFloat
+    private val pr = PR(SAMPLING_RATE.toFloat())
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -171,13 +170,28 @@ class PVNView  @JvmOverloads constructor(
         infoList.add(
             InfoBlock(
                 t, e.floatBuffer.clone(), result.pitch, e.getdBSPL(), result.isPitched,
-                originalFrequency = result.pitch
+                originalFrequency = result.pitch, originalVolume = e.getdBSPL()
             )
         )
         //streaming += e.byteBuffer.toList()
         trunking(infoList[t])
         noting(infoList[t])
         invalidate()
+    }
+
+    fun undo(){
+        infoList.forEach {
+            it.frequency = it.originalFrequency
+            it.volume = it.originalVolume
+            trunks[it.id].y = heightCalc(it.frequency)
+            trunks[it.id].volumeHeight = volumeCalc(it.volume)
+        }
+        if (isInTrunk) {
+            invalidate()
+        } else {
+            changeToTrunk()
+            changeToNote()
+        }
     }
 
     private fun trunking(ib: InfoBlock) {
@@ -478,7 +492,6 @@ class PVNView  @JvmOverloads constructor(
 
     fun setReplay(){
         isForReplay = true
-        pitchShifterFloat = PitchShifterFloat(1.0, SAMPLING_RATE.toDouble(), BLOCK_SIZE, 0)
         if (isInTrunk){
             if (trunks[0].x > splitLine) moveBubbles(trunks[0].x - splitLine)
             if (trunks.last().x < splitLine)  moveBubbles(trunks.last().x - splitLine)
@@ -505,13 +518,8 @@ class PVNView  @JvmOverloads constructor(
                 for (i in currentId..infoList.lastIndex) {
                     if (isOnReplay) {
                         val ib = infoList[i]
-                        var factor = 1f
-                        if (ib.isANote)
-                            factor = ib.frequency / ib.originalFrequency
-                        pitchShifterFloat.setPitchShiftFactor(factor)
-                        val processedBuffer = pitchShifterFloat.process(ib.bufferContent)
-                        //outByteStream.write(ib.bufferContent.toByteArray())
-                        //outByteStream.write(streaming.slice(ib.bufferPos until ib.bufferPos + ib.bufferContent.size).toByteArray())
+                        val processedBuffer = if (synthesisOrOST)
+                            pr.handlePitch(ib.frequency.toDouble(), ib.bufferContent, ib.volume) else ib.bufferContent
                         audioTrack.write(
                             processedBuffer,
                             0, processedBuffer.size, WRITE_BLOCKING //ib.bufferContent.bufferSize

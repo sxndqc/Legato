@@ -7,4 +7,6 @@
     <string name="buttonTextClear">Clear</string>
     <string name="textMute">No Sound</string>
     <string name="noAudioPermission">No Microphone Permission</string>
+    <string name="Original">Original</string>
+    <string name="Synthesis">Synthesis</string>
 </resources>

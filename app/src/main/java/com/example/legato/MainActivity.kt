@@ -2,19 +2,15 @@ package com.example.legato
 
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import android.media.AudioFormat
-import android.media.tv.TvRecordingClient
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
-import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ToggleButton
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.app.ActivityCompat
 import androidx.core.view.GestureDetectorCompat
 import be.tarsos.dsp.AudioDispatcher
@@ -28,14 +24,6 @@ const val SAMPLING_RATE = 22050
 const val BLOCK_SIZE = 2048
 const val BLOCK_OVERLAP = 0
 
-enum class RecordReplay{
-    RECORDING, REPLAYING
-}
-enum class NoteTrunk{
-    NOTE, TRUNK
-}
-
-
 class MainActivity : AppCompatActivity() {
 
     private var permissionGranted = false
@@ -47,8 +35,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var p: PitchProcessor
     private lateinit var mDetector: GestureDetectorCompat
     private lateinit var editor: Editor
-    var reRe: RecordReplay = RecordReplay.RECORDING
-    var noTr: NoteTrunk = NoteTrunk.TRUNK
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,11 +53,9 @@ class MainActivity : AppCompatActivity() {
             if (listeningProcessing){
                 stopRecording()
                 theFrame.setReplay()
-                editor.canReallyReplay = true
             } else {
                 startRecording()
                 theFrame.quitReplay()
-                editor.canReallyReplay = false
             }
         }
         val btnClear = findViewById<Button>(R.id.btnClear)
@@ -79,14 +63,17 @@ class MainActivity : AppCompatActivity() {
             recreate()
         }
 
+        val btnUndo = findViewById<Button>(R.id.btnUndo)
+        btnUndo.setOnClickListener{
+            theFrame.undo()
+        }
+
         val toggleNT: ToggleButton = findViewById(R.id.btnNote)
         toggleNT.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                noTr = NoteTrunk.NOTE
                 theFrame.changeToNote()
             } else {
                 // The toggle is disabled
-                noTr = NoteTrunk.TRUNK
                 theFrame.changeToTrunk()
             }
         }
@@ -97,8 +84,10 @@ class MainActivity : AppCompatActivity() {
             theFrame.invalidate()
         }
 
-        //TODO: 几个状态要写出来
-
+        val toggleSYN: ToggleButton = findViewById(R.id.btnSYN)
+        toggleSYN.setOnCheckedChangeListener { _, isChecked ->
+            theFrame.synthesisOrOST = isChecked
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -137,8 +126,8 @@ class MainActivity : AppCompatActivity() {
             if(permissionGranted){
                 prepareRecording()
             } else {
-//                val herc = findViewById<TextView>(R.id.tvHerz)
-//                "No Audio Permission".also { herc.text = it }
+                val btnSS = findViewById<TextView>(R.id.btnStartStop)
+                "Permit Me!".also { btnSS.text = it }
             }
         }
     }
@@ -163,7 +152,7 @@ class MainActivity : AppCompatActivity() {
         // the process is a processor that send each buffer to a handler
         // the handler contains a Runnable which handle every single pitch
         val pdh = PitchDetectionHandler { result, e ->
-            val pitchInHz = result.pitch
+            //val pitchInHz = result.pitch
             runOnUiThread {
                 frames += 1
 //                val herc = findViewById<TextView>(R.id.tvHerz)
@@ -174,7 +163,6 @@ class MainActivity : AppCompatActivity() {
 //                timestamp.text = e.timeStamp.toString()
 //                theFrames.text = frames.toString()
 //                dbspl.text = e.getdBSPL().toString()
-
                 theFrame.convertToInfo(result, e, frames)
             }
         }
