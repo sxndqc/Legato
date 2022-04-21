@@ -2,11 +2,16 @@
     <string name="app_name">Legato</string>
     <string name="drawingAnnouncement">Draw with music.</string>
     <string name="canvasContentDescription">Legato enables drawing with music.</string>
-    <string name="buttonTextStart">Start</string>
-    <string name="buttonTextPause">Pause</string>
-    <string name="buttonTextClear">Clear</string>
+    <string name="buttonTextStart">开始录音</string>
+    <string name="buttonTextPause">暂停录音</string>
+    <string name="buttonTextClear">全部清除</string>
     <string name="textMute">No Sound</string>
-    <string name="noAudioPermission">No Microphone Permission</string>
-    <string name="Original">Original</string>
-    <string name="Synthesis">Synthesis</string>
+    <string name="noAudioPermission">无录音权限</string>
+    <string name="Original">原始录音</string>
+    <string name="Synthesis">合成声音</string>
+    <string name="gridoff">音准参考</string>
+    <string name="gridon">关闭参考</string>
+    <string name="line">切换显示</string>
+    <string name="note">切换显示</string>
+    <string name="UndoAll">全部撤销</string>
 </resources>

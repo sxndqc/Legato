@@ -127,7 +127,7 @@ class MainActivity : AppCompatActivity() {
                 prepareRecording()
             } else {
                 val btnSS = findViewById<TextView>(R.id.btnStartStop)
-                "Permit Me!".also { btnSS.text = it }
+                R.string.noAudioPermission.also { btnSS.text = it.toString() }
             }
         }
     }
@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
             cnt += 1
 //            times.text = cnt.toString()
             val btn = findViewById<Button>(R.id.btnStartStop)
-            "Stop".also { btn.text = it }
+            btn.text = getString(R.string.buttonTextPause)
             editor.editorValid = false
         }
     }
@@ -194,7 +194,7 @@ class MainActivity : AppCompatActivity() {
             cnt += 1
  //           times.text = cnt.toString()
             val btn = findViewById<Button>(R.id.btnStartStop)
-            "Start".also { btn.text = it }
+            btn.text = getString(R.string.buttonTextStart)
             editor.editorValid = true
         }
     }

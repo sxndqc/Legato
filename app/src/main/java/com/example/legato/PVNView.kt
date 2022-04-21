@@ -98,7 +98,7 @@ class PVNView  @JvmOverloads constructor(
     class Note(
         val id: Int, var thisNote: Int, var infoStart: Int, var infoEnd: Int, var radius: Float,
         var x: Float = NO_VALUE, var y: Float = NO_VALUE, var isRest: Boolean,
-        var alive: Boolean, var played: Boolean = false, var lastNote: Int = -150
+        var alive: Boolean, var played: Boolean = false, var lastNote: Int = -150, var error: Float
     )
     private var trunks: MutableList<Trunk> = mutableListOf()
     private var notes: MutableList<Note> = mutableListOf()
@@ -173,7 +173,26 @@ class PVNView  @JvmOverloads constructor(
                 originalFrequency = result.pitch, originalVolume = e.getdBSPL()
             )
         )
-        //streaming += e.byteBuffer.toList()
+        if (t>1) {
+            val note2 = noteCalc(infoList[t-2].frequency)
+            val note1 = noteCalc(infoList[t-1].frequency)
+            val note0 = noteCalc(infoList[t].frequency)
+            if ((note1 - max(note2, note0)>5) or
+                    (min(note2, note0) - note1 >5)){
+                infoList[t-1].frequency = (infoList[t].frequency + infoList[t-2].frequency) / 2
+                infoList[t-1].originalFrequency = infoList[t-1].frequency
+                trunks.removeLast()
+                addTrunk(lastIndexX - SPEED / 2, infoList[t-1])
+                // if not match, there must be a note more
+                notes.removeLast()
+                addNote(lastIndexX - NOTE_DISPOSITION - NOTE_MOVE, infoList[t-1])
+                // this place is not right:  应该是：跳进不可能只发生0.1ms，所以一个音符如果不在两个音符划分出来的
+            // 方框内，那就要拉回来，要么它靠近其中一个音符，要么在两个音符之间的斜线上
+                // 而且trunking已经更改了lastX的位置了，所以造成了不对应。不光是同音问题，而且还有一个音符渐变的问题。
+                // 这个叫智能滤波： filtering，要写在文章里面
+
+            }
+        }
         trunking(infoList[t])
         noting(infoList[t])
         invalidate()
@@ -217,6 +236,7 @@ class PVNView  @JvmOverloads constructor(
     private fun noting(ib: InfoBlock){
         // if diverged from previous average for 1/12 scale, then counted as a separated note
         if (addNote(lastIndexX - NOTE_DISPOSITION, ib)) {
+            // 这又出来个问题，如果以为上一个音新的，结果被校正了的话，x还是移动了
             notes.forEach {
                 it.x -= NOTE_MOVE
                 it.alive = !((it.x < 0) or (it.x > this.width))
@@ -229,25 +249,40 @@ class PVNView  @JvmOverloads constructor(
         // this should include an algorithm
         // unstably and harmony
         val thisNote = noteCalc(ib.frequency)
-        return if (thisNote !=currentNote){
+        // Below are note concatenation
+        // We used a vote mechanism, to determine whether a frequency is more to one note or another
+        // Oh, Kotlin will calculate each of the expression
+        return if ((abs(thisNote - currentNote) <= 1) and // ib==0 should not enter here
+            whyKotlinCalculateAllExp(ib.id)) {
+                // calculate which is better
+                if (errorCalc(ib.frequency, thisNote) < notes.last().error){
+                    currentNote = thisNote
+                    notes.last().thisNote = thisNote
+                    notes.last().y = noteHeightCalc(thisNote)
+                }
+                notes.last().infoEnd = ib.id
+                notes.last().radius = radiusCalc(notes.last().infoEnd - notes.last().infoStart)
+                ib.noteBelong = notes.lastIndex
+                ib.noteBelongStart = notes.last().infoStart
+                false
+        } else {
             notes.add(
-                Note(
-                    notes.size, thisNote, ib.id, ib.id, radiusCalc(0),
-                    x, noteHeightCalc(thisNote), isRest = !ib.isANote,
-                    alive = true, played = false, lastNote = currentNote
-                )
+                    Note(
+                            notes.size, thisNote, ib.id, ib.id, radiusCalc(0),
+                            x, noteHeightCalc(thisNote), isRest = !ib.isANote,
+                            alive = true, played = false, lastNote = currentNote, error = errorCalc(ib.frequency, thisNote)
+                    )
             )
             currentNote = thisNote
             ib.noteBelong = notes.lastIndex
             ib.noteBelongStart = notes.last().infoStart
             true
-        } else {
-            notes.last().infoEnd = ib.id
-            notes.last().radius = radiusCalc(notes.last().infoEnd - notes.last().infoStart)
-            ib.noteBelong = notes.lastIndex
-            ib.noteBelongStart = notes.last().infoStart
-            false
         }
+    }
+
+    private fun whyKotlinCalculateAllExp(index: Int) : Boolean{
+        if (index ==0) return false
+        return (abs(log2(infoList[index].frequency / infoList[index-1].frequency) * 12) < 0.5)
     }
 
     @RequiresApi(Build.VERSION_CODES.N)
@@ -431,11 +466,13 @@ class PVNView  @JvmOverloads constructor(
     }
 
     private fun volumeCalc(volume: Double) : Float {
-        return ((volume - (-80)) * 6).toFloat()
+        return height440 / 400f * 10f.pow(100f / -volume.toFloat())
+        //return ((volume - (-80)) * 6).toFloat()
     }
 
     private fun volumeBackCalc(volumeHeight: Float): Double{
-        return (volumeHeight / 6 - 80).toDouble()
+        return - 100 / log10(volumeHeight *400 / height440.toDouble())
+        // return (volumeHeight / 6 - 80).toDouble()
     }
 
     private fun noteCalc(freq: Float) : Int {
@@ -443,6 +480,10 @@ class PVNView  @JvmOverloads constructor(
             (log2(freq / 440) * 12).roundToInt()
         else
             -100
+    }
+
+    private fun errorCalc(freq: Float, thisNote: Int) : Float{
+        return abs(log2(freq / thisNote) * 12)
     }
 
     private fun radiusCalc(length: Int) : Float {
@@ -486,10 +527,6 @@ class PVNView  @JvmOverloads constructor(
         if (grid) drawGrid(canvas)
     }
 
-    fun test(){
-        Log.d(DEBUG_TAG, "onDown")
-    }
-
     fun setReplay(){
         isForReplay = true
         if (isInTrunk){
@@ -514,7 +551,7 @@ class PVNView  @JvmOverloads constructor(
             }
 
             val audioSender = Runnable {
-                Log.d("Here!", "Here")
+                // Log.d("Here!", "Here")
                 for (i in currentId..infoList.lastIndex) {
                     if (isOnReplay) {
                         val ib = infoList[i]
@@ -567,6 +604,9 @@ class PVNView  @JvmOverloads constructor(
     }
 
     fun changeToNote(){
+
+        // lastX here is problematic
+
         isInTrunk = false
         // align at lastX
         // actually, after editing, note needs re-generation from info blocks...
@@ -593,6 +633,10 @@ class PVNView  @JvmOverloads constructor(
                 it.alive = !((it.x < 0) or (it.x > this.width))
                 it.played = it.x < splitLine
             }
+
+            lastIndexX = notes.last().x + NOTE_DISPOSITION
+            // 为什么会重叠，因为以前是lastX对齐，现在改成录音线对齐了，结果lastX忘了对齐，如果两个长度有差距的话问题就大了。
+
             if (isForReplay) {
                 if (notes[0].x > splitLine) moveBubbles(notes[0].x - splitLine)
                 else if (notes.last().x < splitLine) moveBubbles(notes.last().x - splitLine)
@@ -618,6 +662,7 @@ class PVNView  @JvmOverloads constructor(
             }
         }
         if (trunks.isNotEmpty()) {
+            lastIndexX = trunks.last().x + SPEED / 2
             if (isForReplay) {
                 if (trunks[0].x > splitLine) moveBubbles(trunks[0].x - splitLine)
                 else if (trunks.last().x < splitLine)  moveBubbles(trunks.last().x - splitLine)

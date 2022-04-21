@@ -12,9 +12,15 @@ android {
         minSdkVersion 16
         targetSdkVersion 31
         versionCode 1
-        versionName "1.0"
+        versionName "1.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    android.applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "Legato_${buildType.name}_v${versionName}.apk"
+        }
     }
 
     buildTypes {

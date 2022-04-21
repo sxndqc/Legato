@@ -19,7 +19,7 @@ class PR @JvmOverloads constructor(private val samplerate: Float, private val fo
     private var previousFrequencyIndex  = 0
 
     fun handlePitch(frequency: Double, originalAudioBuffer: FloatArray, volume: Double): FloatArray {
-        var frequency = frequency
+        var frequency = frequency * 2
         //var frequency = pitchDetectionResult.pitch.toDouble()
         if (frequency == -1.0) {
             frequency = prevFrequency

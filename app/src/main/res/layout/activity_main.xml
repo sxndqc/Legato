@@ -120,7 +120,7 @@
             style="@style/Widget.AppCompat.Button"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:text="UndoAll"
+            android:text="@string/UndoAll"
             android:layout_weight="1"
             android:textSize="12sp" />
 
@@ -151,8 +151,8 @@
             style="@style/Widget.AppCompat.Button"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:textOff="Line"
-            android:textOn="Note"
+            android:textOff="@string/line"
+            android:textOn="@string/note"
             android:layout_weight="1"
             android:textSize="12sp" />
 
@@ -167,8 +167,8 @@
             style="@style/Widget.AppCompat.Button"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:textOff="GridOff"
-            android:textOn="GridOn"
+            android:textOff="@string/gridoff"
+            android:textOn="@string/gridon"
             android:layout_weight="1"
             android:textSize="12sp" />
 

@@ -20,10 +20,7 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
     private var movingSwipe by Delegates.notNull<Boolean>()
 
     override fun onDown(event: MotionEvent): Boolean {
-        return if (editorValid) {
-            Log.d(DEBUG_TAG, "onDown: $event")
-            true
-        } else false
+        return editorValid
     }
 
 //    override fun onFling(
@@ -49,7 +46,7 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
     ): Boolean {
         return if (editorValid) {
             initialMoveCount += 1
-            Log.d(DEBUG_TAG, "onScroll: $event1 $event2")
+            // Log.d(DEBUG_TAG, "onScroll: $event1 $event2")
             if (initialMoveCount == 1) {
                 movingSwipe = kotlin.math.abs(distanceX) > kotlin.math.abs(distanceY)
                 if (canReallyReplay){
@@ -71,7 +68,7 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
         // use this to determine initial move direction
         if (editorValid) {
             initialMoveCount = 0
-            Log.d(DEBUG_TAG, "onShowPress: $event")
+            // Log.d(DEBUG_TAG, "onShowPress: $event")
         }
     }
 
@@ -91,7 +88,7 @@ class Editor(initialValid: Boolean, private val viewToEdit: PVNView): GestureDet
 //    }
 
     override fun onSingleTapConfirmed(event: MotionEvent): Boolean {
-        Log.d(DEBUG_TAG, "onSingleTapConfirmed: $event")
+        // Log.d(DEBUG_TAG, "onSingleTapConfirmed: $event")
         return if (editorValid) {
             canReallyReplay = !canReallyReplay
             if(canReallyReplay){
